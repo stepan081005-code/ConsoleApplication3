@@ -1,313 +1,274 @@
-﻿#include <iostream>
-#include <vector>
-#include <clocale>
-using namespace std;
+﻿#include "Windows.h"
+#include "string"
+#pragma comment(lib, "Msimg32.lib") // библиотека нужна для работы метода TransparentBlt
 
-
-string normalize(string text)
+//стурктура где храняться данные о windows окне
+struct
 {
-    string res;
-    for (char c : text)
-        if (c != ' ' && c != '\n' && c != '\t' && c != '\r')
-        {
-            res += c;
-        }
+	//дескрипторы, контейнеры и буфферы для windows
+	RECT rc;
+	HINSTANCE hIns;
+	HWND hWnd;
+	HDC dev_cont, contx;
+	MSG msg;
+	BOOL gbool = true;
 
+	//определяет размер экрана в вашей сиситеме
+	int width = GetSystemMetrics(SM_CXSCREEN), height = GetSystemMetrics(SM_CYSCREEN);
+	int startPosX = 0, startPosY = 0;
+	bool fullscreen = false;
 
-    return res;
+} window;
+
+//обработка потока сообщений
+static LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	switch (msg)
+	{
+	case WM_CLOSE:
+		PostQuitMessage(0);
+		break;
+	default:
+		return DefWindowProc(hWnd, msg, wParam, lParam);
+	}
+};
+
+//создания windows окна
+void InitWindow()
+{
+	//имя класса окна
+	const char* NameClass = "Window";
+
+	//размер окна
+	window.rc = { 0,0,window.width,window.height
+	};
+
+	//учет размера
+	AdjustWindowRect(&window.rc, WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU, FALSE);
+
+	//дескриптор класса окна
+	WNDCLASSEX wc = { 0 };
+	wc.cbSize = sizeof(wc);
+	wc.lpszClassName = NameClass;
+	wc.hInstance = window.hIns;
+	wc.lpfnWndProc = &WindowProc;
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
+	//регистрация класса окна
+	auto NameClassId = RegisterClassEx(&wc);
+
+	// диструкторы окна
+	if (window.fullscreen)
+	{
+		window.hWnd = CreateWindowEx(
+			WS_EX_TOPMOST,
+			MAKEINTATOM(NameClassId),
+			"project_test",
+			WS_POPUP | WS_VISIBLE,
+			window.startPosX, window.startPosY,
+			window.rc.right - window.rc.left,
+			window.rc.bottom - window.rc.top,
+			NULL,
+			NULL,
+			window.hIns,
+			NULL
+		);
+	}
+	else
+	{
+		window.hWnd = CreateWindowEx(
+			NULL,
+			MAKEINTATOM(NameClassId),
+			"project_test",
+			WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU,
+			window.startPosX,
+			window.startPosY,
+			window.rc.right - window.rc.left,
+			window.rc.bottom - window.rc.top,
+			NULL,
+			NULL,
+			window.hIns,
+			NULL
+		);
+	}
+
+	//показ окна
+	ShowWindow(window.hWnd, SW_SHOW);
 }
-struct nextRoom
+
+//начало обрезки изображения
+HRGN BEGIN_CLIP(HDC hdc, int x, int y, int w, int h)
 {
-    string room;
-    string room2;
-    string room3;
-};
+	HRGN _clip_rgn = CreateRectRgn((x), (y), (x)+(w), (y)+(h));
+	SelectClipRgn((hdc), _clip_rgn);
 
-struct house
+	return _clip_rgn;
+}
+//конец обрезки изображения
+void END_CLIP(HDC hdc, HRGN _clip_rgn)
 {
-    int nam;
-    string room;
-    vector<nextRoom> nextroom;
-    vector<string> back;
-    vector<string> items;
+	SelectClipRgn((hdc), NULL);
+	DeleteObject(_clip_rgn);
+}
 
-
-};
-
-struct player
+//отрисовка изображений .bmp
+void ShowBitmap(HDC hDC, int x, int y, int x1, int y1, HBITMAP hBitmap, bool alpha = false)
 {
-    string room;
-    string hands;
-    string back;
-    vector<string> items;
+	HBITMAP hbm, hOldbm;
+	HDC hMemDC;
+	BITMAP bm;
 
-};
+	hMemDC = CreateCompatibleDC(hDC); // Создаем контекст памяти, совместимый с контекстом отображения
+	hOldbm = (HBITMAP)SelectObject(hMemDC, hBitmap);// Выбираем изображение bitmap в контекст памяти
 
+	if (hOldbm) // Если не было ошибок, продолжаем работу
+	{
+		GetObject(hBitmap, sizeof(BITMAP), (LPSTR)&bm); // Определяем размеры изображения
 
-vector<house> myrooms = {
-{ 0," спальня  ",{ { " прихожая " } },{ "" } },
-{ 1," прихожая ",{ { " зал " },{ " коридор " } },{ " спальня \n" } },
-{ 2," зал ",{ { " балкон " } },{ " прихожая \n" } },
-{ 3," коридор  ",{ { " кухня   " },{ " туалет " },{ " ванная " } },{ " прихожая \n" } },
-{ 4," кухня    ",{},{ " коридор \n" } },
-{ 5," туалет   ",{},{ " коридор \n" } },
-{ 6," ванная   ",{},{ " коридор \n" } },
-{ 7," балкон   ",{},{ " зал \n" } }
+		if (alpha)
+		{
+			TransparentBlt(window.contx, x, y, x1, y1, hMemDC, 0, 0, bm.bmWidth, bm.bmHeight, RGB(255, 255, 255));//все пиксели белого цвета будут интепретированы как прозрачные
+		}
+		else
+		{
+			StretchBlt(hDC, x, y, x1, y1, hMemDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY); // Рисуем изображение bitmap
+		}
 
-};
+		SelectObject(hMemDC, hOldbm);// Восстанавливаем контекст памяти
+	}
 
+	DeleteDC(hMemDC); // Удаляем контекст памяти
+}
 
-//void List()
-//{
-//    for (int i = 0; i < item.size(); i++)
-//    {
-//        cout << "items " << item[i];
-//    }
-//}
-//
-//void List()
-//{
-//    for (int i = 0; i < backpack.size(); i++)
-//    {
-//        cout << "backpack " << backpack[i];
-//    }
-//}
-int x = 0;
-
-int main()
+//загрузка данных из файла .bmp
+HBITMAP GetHBITMAP(const LPCSTR& NameImage)
 {
-    setlocale(LC_ALL, "Russian");
+	return (HBITMAP)LoadImageA(NULL, NameImage, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+}
 
-    cout << "Добро пожаловать в игру!!!\nСегодня 01.06.2026. Вы просыпаетесь на кровати в спальне, ваша цель открыть сейф\n";
+//рисование заливкой
+void FillTile(HDC hdc, int px, int py, int size, COLORREF color)
+{
+	RECT r = { px, py, px + size, py + size };
+	HBRUSH br = CreateSolidBrush(color);
+	FillRect(hdc, &r, br);
+	DeleteObject(br);
+}
 
-  
-    
-    
-    int current = 0;
-    const house& r = myrooms[current];
-    cout << "\n=== Вы в комнате: [" << r.nam << "] " << r.room << " ===\n";
-   
-    /*for (const house& item : myrooms) {
-        cout << item.nam;
-        cout << item.room;
-        for (const next& room : item.nextroom) {
-            cout << " можно перейти в: ";
-            cout << room.room;
-            cout << room.room2;
-            cout << room.room3;
-        }
-        for (const string& room : item.back) {
-            cout << " можно вернуться в: ";
-            cout << room;
-            if (room == "")
-                cout << "некуда\n";
-        }
-    }*/
-    // =====================================================
-     // === ДОПИСАННЫЙ КОД — навигация между комнатами    ===
-     // =====================================================
+//ковертирует число в текст для WriteText
+LPCSTR ConvertNumInText(float num)
+{
+	static char txt[32];
+	_snprintf_s(txt, sizeof(txt), _TRUNCATE, "%.2f", num);
+	return txt;
+}
 
-     // Функция очистки строки от пробелов и переносов для корректного сравнения
-    
+//печатает текст
+void WriteText(int x, int y, LPCSTR Text, COLORREF color = RGB(255, 255, 255))
+{
+	//поиграем шрифтами и цветами
+	SetTextColor(window.contx, color);
+	SetBkColor(window.contx, RGB(0, 0, 0));
+	SetBkMode(window.contx, TRANSPARENT);
+	HFONT hFont = CreateFontW(
+		70, 0, 0, 0, FW_BOLD, 0, 0, 0,
+		RUSSIAN_CHARSET,
+		OUT_DEFAULT_PRECIS,
+		CLIP_DEFAULT_PRECIS,
+		DEFAULT_QUALITY,
+		DEFAULT_PITCH | FF_DONTCARE,
+		L"CALIBRI"
+	);
 
-    //auto normalize = [](string text) -> string {
-    //    string res;
-    //    for (char c : text)
-    //        if (c != ' ' && c != '\n' && c != '\t' && c != '\r')
-    //            res += c;
-    //    return res;
-    //    };
+	auto hTmp = (HFONT)SelectObject(window.contx, hFont);
 
-    myrooms[0].items = { "сейф","фонарик"  };          // === НОВОЕ: сейф в спальне ===
-    myrooms[2].items = { "фонарик" };
-    myrooms[4].items = { "записка с кодом" };
-    myrooms[6].items = { "ключ от сейфа" };
-    myrooms[7].items = { "бинокль" };
+	TextOutA(window.contx, x, y, Text, strlen(Text));
 
+	SelectObject(window.contx, hTmp);
+	DeleteObject(hFont);
+}
 
-    /*int x;
-    cin >> x;*/
+//обновление изображений
+void UpdateImage()
+{
+	BitBlt(window.dev_cont, 0, 0, window.width, window.height, window.contx, 0, 0, SRCCOPY);
+	//отрисовка заднего фона
+	ShowBitmap(window.contx, 0, 0, window.width, window.height, GetHBITMAP("back.bmp"));
 
-    /*switch (x)
-    {
-    case 1:
-    {
-
-        List();
-
-    }
-    case 2:
-    {
-
-        Trunk();
-
-    }
+	WriteText(100, 60, "Привет Windows!");
+}
 
 
-    default:
-        break;
-    }*/
+//загрузка модулей приложения
+void InitApp()
+{
+	//создание и иниализация контекста устройсва и девайс устройства
+	window.dev_cont = GetDC(window.hWnd);
+	window.contx = CreateCompatibleDC(window.dev_cont);
+	SelectObject(window.contx, CreateCompatibleBitmap(window.dev_cont, window.width, window.height));
+}
 
-
-    player hero;
-    hero.room = myrooms[0].room;
-
-    int cur = 0;   // текущая комната игрока
-    cout << "\n\n========================================\n";
-    cout << "        НАЧАЛО ИГРЫ — НАВИГАЦИЯ\n";
-    cout << "========================================\n";
-    cout << "Вводите номер комнаты для перехода,\n";
-    cout << "номер предмета (от 10) чтобы взять его,\n";
-    cout << "99 — открыть рюкзак, -1 — выход.\n";
-
-    while (true)
-    {
-        if (x == 2)
-        {
-            x = 0;
-            system("cls");
-
-        }
-        x++;
-        const house& cr = myrooms[cur];
-        cout << "\n>>> Вы в комнате: [" << cr.nam << "]" << cr.room << "<<<\n";
-
-        // Собираем все доступные направления из nextroom и back
-        vector<int> dests;
-
-        auto tryAdd = [&](const string& destName) {
-            string nd = normalize(destName);
-            if (nd.empty()) return;
-            for (const auto& h : myrooms) {
-                if (normalize(h.room) == nd) {
-                    bool dup = false;
-                    for (int d : dests)
-                        if (d == h.nam) 
-                        { dup = true; break; }
-                    if (!dup) dests.push_back(h.nam);
-                }
-            }
-            };
-
-        for (const auto& nr : cr.nextroom) {
-            tryAdd(nr.room);
-            tryAdd(nr.room2);
-            tryAdd(nr.room3);
-        }
-        for (const string& b : cr.back) {
-            tryAdd(b);
-        }
-
-        // Показываем доступные комнаты
-        if (dests.empty()) {
-            cout << "  Отсюда некуда идти.\n";
-        }
-        else {
-            cout << "  Доступные направления:\n";
-            for (int d : dests)
-                cout << "    [" << d << "]" << myrooms[d].room << "\n";
-        }
-
-        // === Показываем предметы в текущей комнате ===
-        if (!cr.items.empty()) {
-            cout << "  Предметы в комнате:\n";
-            for (size_t i = 0; i < cr.items.size(); ++i) {
-                cout << "    [" << (10 + i) << "] Взять: " << cr.items[i] << "\n";
-            }
-        }
-        cout << "    [99] Посмотреть инвентарь (рюкзак)\n";
-
-        // Читаем выбор игрока
-        cout << "  Ваш выбор: ";
-        int choice;
-        if (!(cin >> choice)) {
-            cin.clear();
-            cin.ignore(10000, '\n');
-            cout << "  Введите число!\n";
-            continue;
-        }
-        if (choice == -1) {
-            cout << "Выход из игры. До свидания!\n";
-            break;
-        }
+//обновление приложения
+void UpdateApp()
+{
 
 
 
 
 
 
-        // === Обработка взятия предмета ===
-        if (choice >= 10 && choice < 10 + (int)cr.items.size()) {
-            int itemIndex = choice - 10;
-            string taken = cr.items[itemIndex];
 
-            // === НОВОЕ: Особая обработка сейфа ===
-            if (taken == "сейф") {
-                bool hasKey = false, hasCode = false;
-                for (const string& it : hero.items) {
-                    if (it == "ключ от сейфа") hasKey = true;
-                    if (it == "записка с кодом") hasCode = true;
-                }
 
-                if (!hasKey && !hasCode) {
-                    cout << "  >> Сейф заперт! У вас нет ключа и нет кода.\n";
-                    cout << "  >> Нужно найти ключ от сейфа и записку с кодом.\n";
-                }
-                else if (!hasKey) {
-                    cout << "  >> У вас есть код, но нет ключа от сейфа!\n";
-                    cout << "  >> Поищите ключ в другой комнате.\n";
-                }
-                else if (!hasCode) {
-                    cout << "  >> У вас есть ключ, но вы не знаете код!\n";
-                    cout << "  >> Поищите записку с кодом в другой комнате.\n";
-                }
-                else {
-                    cout << "\n==================================================\n";
-                    cout << " Вы вставили ключ, набрали код... ЩЕЛК!\n";
-                    cout << " Сейф открыт! Внутри — золотые слитки!\n";
-                    cout << " ПОБЕДА! Поздравляем с прохождением игры!\n";
-                    cout << "==================================================\n";
-                    break;
-                }
-                continue; // сейф остаётся в комнате
-            }
 
-            hero.items.push_back(taken);
-            myrooms[cur].items.erase(myrooms[cur].items.begin() + itemIndex);
 
-            cout << "  >> Вы подобрали: [" << taken << "]!\n";
-            continue;
-        }
 
-        // === Просмотр инвентаря ===
-        if (choice == 99) {
-            cout << "\n  --- ВАШ РЮКЗАК ---\n";
-            if (hero.items.empty()) {
-                cout << "  (рюкзак пуст)\n";
-            }
-            else {
-                for (size_t i = 0; i < hero.items.size(); ++i) {
-                    cout << "  " << (i + 1) << ". " << hero.items[i] << "\n";
-                }
-            }
-            cout << "  ------------------\n";
-            continue;
-        }
+}
 
-        // Проверяем, можно ли туда перейти
-        bool ok = false;
-        for (int d : dests)
-            if (d == choice) { ok = true; break; }
 
-        if (ok) {
-            cur = choice;
-            hero.room = myrooms[cur].room;
-            cout << "  Вы перешли в комнату [" << cur << "]" << myrooms[cur].room << "\n";
-        }
-        else {
-            cout << "  Нельзя туда попасть из этой комнаты!\n";
-        }
-    }
+//обработка команд устройств ввода
+void UpdateKeyCode()
+{
+	//выход из приложения на ESC
+	if (GetAsyncKeyState(VK_ESCAPE))
+	{
+		window.msg.message = WM_QUIT;
+	}
+}
 
-    return 0;
+//вход в программу
+int CALLBACK WinMain(
+	HINSTANCE hInstance,
+	HINSTANCE hPrevInstance,
+	LPSTR lpCmdLine,
+	int nShowCmd)
+{
+	window.hIns = hInstance;
+	InitWindow();
+	InitApp();
+
+	//основной цикл обновления приложения
+	while (window.gbool)
+	{
+		//обработка соощений для окна
+		while (PeekMessage(&window.msg, NULL, 0, 0, PM_REMOVE))
+		{
+			UpdateKeyCode();
+
+			//отбработка сообщений
+			if (window.msg.message == WM_QUIT)
+			{
+				window.gbool = false;
+				break;
+			}
+			TranslateMessage(&window.msg);
+			DispatchMessage(&window.msg);
+		}
+
+		UpdateImage();
+		UpdateApp();
+
+		//задержка обновления
+		Sleep(16);
+	}
+	return 0;
 }
