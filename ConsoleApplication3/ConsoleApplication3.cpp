@@ -18,6 +18,7 @@ struct
 	int startPosX = 0, startPosY = 0;
 	bool fullscreen = false;
 
+
 } window;
 
 //обработка потока сообщений
