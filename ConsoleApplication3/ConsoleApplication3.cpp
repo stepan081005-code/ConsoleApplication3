@@ -3,90 +3,150 @@
 #include <clocale>
 using namespace std;
 
+
+string normalize(string text)
+{
+    string res;
+    for (char c : text)
+        if (c != ' ' && c != '\n' && c != '\t' && c != '\r')
+        {
+            res += c;
+        }
+
+
+    return res;
+}
+struct nextRoom
+{
+    string room;
+    string room2;
+    string room3;
+};
+
+struct house
+{
+    int nam;
+    string room;
+    vector<nextRoom> nextroom;
+    vector<string> back;
+    vector<string> items;
+
+
+};
+
+struct player
+{
+    string room;
+    string hands;
+    string back;
+    vector<string> items;
+
+};
+
+
+vector<house> myrooms = {
+{ 0," спальня  ",{ { " прихожая " } },{ "" } },
+{ 1," прихожая ",{ { " зал " },{ " коридор " } },{ " спальня \n" } },
+{ 2," зал ",{ { " балкон " } },{ " прихожая \n" } },
+{ 3," коридор  ",{ { " кухня   " },{ " туалет " },{ " ванная " } },{ " прихожая \n" } },
+{ 4," кухня    ",{},{ " коридор \n" } },
+{ 5," туалет   ",{},{ " коридор \n" } },
+{ 6," ванная   ",{},{ " коридор \n" } },
+{ 7," балкон   ",{},{ " зал \n" } }
+
+};
+
+
+//void List()
+//{
+//    for (int i = 0; i < item.size(); i++)
+//    {
+//        cout << "items " << item[i];
+//    }
+//}
+//
+//void List()
+//{
+//    for (int i = 0; i < backpack.size(); i++)
+//    {
+//        cout << "backpack " << backpack[i];
+//    }
+//}
+int x = 0;
+
 int main()
 {
     setlocale(LC_ALL, "Russian");
 
     cout << "Добро пожаловать в игру!!!\nСегодня 01.06.2026. Вы просыпаетесь на кровати в спальне, ваша цель открыть сейф\n";
 
-    struct next
-    {
-        string room;
-        string room2;
-        string room3;
-    };
-
-    struct house
-    {
-        int nam;
-        string room;
-        vector<next> nextroom;
-        vector<string> back;
-        vector<string> items;
-
-
-    };
-
-    struct player
-    {
-        string room;
-        string hands;
-        string back;
-        vector<string> items;
-
-    };
-
-
-    vector<house> myrooms = {
-    { 0," спальня  ",{ { " прихожая " } },{ "" } },
-    { 1," прихожая ",{ { " зал " },{ " коридор " } },{ " спальня \n" } },
-    { 2," зал ",{ { " балкон " } },{ " прихожая \n" } },
-    { 3," коридор  ",{ { " кухня   " },{ " туалет " },{ " ванная " } },{ " прихожая \n" } },
-    { 4," кухня    ",{},{ " коридор \n" } },
-    { 5," туалет   ",{},{ " коридор \n" } },
-    { 6," ванная   ",{},{ " коридор \n" } },
-    { 7," балкон   ",{},{ " зал \n" } }
-
-    };
-
+  
+    
+    
     int current = 0;
     const house& r = myrooms[current];
     cout << "\n=== Вы в комнате: [" << r.nam << "] " << r.room << " ===\n";
-
-    //for (const house& item : myrooms) {
-    //    cout << item.nam;
-    //    cout << item.room;
-    //    for (const next& room : item.nextroom) {
-    //        cout << " можно перейти в: ";
-    //        cout << room.room;
-    //        cout << room.room2;
-    //        cout << room.room3;
-    //    }
-    //    for (const string& room : item.back) {
-    //        cout << " можно вернуться в: ";
-    //        cout << room;
-    //        if (room == "")
-    //            cout << "некуда\n";
-    //    }
-    //}
+   
+    /*for (const house& item : myrooms) {
+        cout << item.nam;
+        cout << item.room;
+        for (const next& room : item.nextroom) {
+            cout << " можно перейти в: ";
+            cout << room.room;
+            cout << room.room2;
+            cout << room.room3;
+        }
+        for (const string& room : item.back) {
+            cout << " можно вернуться в: ";
+            cout << room;
+            if (room == "")
+                cout << "некуда\n";
+        }
+    }*/
     // =====================================================
      // === ДОПИСАННЫЙ КОД — навигация между комнатами    ===
      // =====================================================
 
      // Функция очистки строки от пробелов и переносов для корректного сравнения
-    auto normalize = [](string s) -> string {
-        string res;
-        for (char c : s)
-            if (c != ' ' && c != '\n' && c != '\t' && c != '\r')
-                res += c;
-        return res;
-        };
+    
 
-    myrooms[0].items = { "сейф" };          // === НОВОЕ: сейф в спальне ===
+    //auto normalize = [](string text) -> string {
+    //    string res;
+    //    for (char c : text)
+    //        if (c != ' ' && c != '\n' && c != '\t' && c != '\r')
+    //            res += c;
+    //    return res;
+    //    };
+
+    myrooms[0].items = { "сейф","фонарик"  };          // === НОВОЕ: сейф в спальне ===
     myrooms[2].items = { "фонарик" };
     myrooms[4].items = { "записка с кодом" };
     myrooms[6].items = { "ключ от сейфа" };
     myrooms[7].items = { "бинокль" };
+
+
+    /*int x;
+    cin >> x;*/
+
+    /*switch (x)
+    {
+    case 1:
+    {
+
+        List();
+
+    }
+    case 2:
+    {
+
+        Trunk();
+
+    }
+
+
+    default:
+        break;
+    }*/
 
 
     player hero;
@@ -102,6 +162,13 @@ int main()
 
     while (true)
     {
+        if (x == 2)
+        {
+            x = 0;
+            system("cls");
+
+        }
+        x++;
         const house& cr = myrooms[cur];
         cout << "\n>>> Вы в комнате: [" << cr.nam << "]" << cr.room << "<<<\n";
 
@@ -115,7 +182,8 @@ int main()
                 if (normalize(h.room) == nd) {
                     bool dup = false;
                     for (int d : dests)
-                        if (d == h.nam) { dup = true; break; }
+                        if (d == h.nam) 
+                        { dup = true; break; }
                     if (!dup) dests.push_back(h.nam);
                 }
             }
@@ -162,6 +230,11 @@ int main()
             cout << "Выход из игры. До свидания!\n";
             break;
         }
+
+
+
+
+
 
         // === Обработка взятия предмета ===
         if (choice >= 10 && choice < 10 + (int)cr.items.size()) {
